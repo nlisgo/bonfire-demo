@@ -6,16 +6,20 @@ interface ApiModeContextType {
   setApiMode: (mode: ApiMode) => void;
   isRealApi: boolean;
   isMockApi: boolean;
-  onModeChange?: (mode: ApiMode) => void;
 }
 
 const ApiModeContext = createContext<ApiModeContextType | undefined>(undefined);
 
-export function ApiModeProvider({ children, onModeChange }: { children: ReactNode; onModeChange?: (mode: ApiMode) => void }) {
-  const [apiMode, setApiModeState] = useState<ApiMode>(() => {
-    const stored = localStorage.getItem("bonfire_api_mode");
-    return (stored === "real" || stored === "mock") ? stored : "mock";
-  });
+export function ApiModeProvider({ 
+  children, 
+  initialMode,
+  onModeChange 
+}: { 
+  children: ReactNode; 
+  initialMode: ApiMode;
+  onModeChange?: (mode: ApiMode) => void;
+}) {
+  const [apiMode, setApiModeState] = useState<ApiMode>(initialMode);
 
   useEffect(() => {
     localStorage.setItem("bonfire_api_mode", apiMode);
@@ -39,7 +43,6 @@ export function ApiModeProvider({ children, onModeChange }: { children: ReactNod
         setApiMode,
         isRealApi: apiMode === "real",
         isMockApi: apiMode === "mock",
-        onModeChange,
       }}
     >
       {children}

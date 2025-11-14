@@ -52,7 +52,7 @@ function createApolloClient(mode: ApiMode) {
   });
 }
 
-function Protected Route({ component: Component }: { component: () => JSX.Element }) {
+function ProtectedRoute({ component: Component }: { component: () => JSX.Element }) {
   const { isAuthenticated } = useAuth();
   
   if (!isAuthenticated) {
