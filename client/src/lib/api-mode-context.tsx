@@ -6,11 +6,12 @@ interface ApiModeContextType {
   setApiMode: (mode: ApiMode) => void;
   isRealApi: boolean;
   isMockApi: boolean;
+  onModeChange?: (mode: ApiMode) => void;
 }
 
 const ApiModeContext = createContext<ApiModeContextType | undefined>(undefined);
 
-export function ApiModeProvider({ children }: { children: ReactNode }) {
+export function ApiModeProvider({ children, onModeChange }: { children: ReactNode; onModeChange?: (mode: ApiMode) => void }) {
   const [apiMode, setApiModeState] = useState<ApiMode>(() => {
     const stored = localStorage.getItem("bonfire_api_mode");
     return (stored === "real" || stored === "mock") ? stored : "mock";
@@ -23,6 +24,12 @@ export function ApiModeProvider({ children }: { children: ReactNode }) {
   const setApiMode = (mode: ApiMode) => {
     setApiModeState(mode);
     localStorage.removeItem("bonfire_jwt_token");
+    // Call external mode change handler if provided
+    if (onModeChange) {
+      onModeChange(mode);
+    }
+    // Force page reload to ensure clean state
+    window.location.reload();
   };
 
   return (
@@ -32,6 +39,7 @@ export function ApiModeProvider({ children }: { children: ReactNode }) {
         setApiMode,
         isRealApi: apiMode === "real",
         isMockApi: apiMode === "mock",
+        onModeChange,
       }}
     >
       {children}

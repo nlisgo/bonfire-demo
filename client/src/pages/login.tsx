@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
+import * as ApolloClientReact from "@apollo/client/react/index.js";
+const { useMutation } = ApolloClientReact;
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { loginSchema, type LoginCredentials } from "@shared/schema";
@@ -11,14 +13,32 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { useApiMode } from "@/lib/api-mode-context";
 import { ApiModeToggle } from "@/components/api-mode-toggle";
+import { LOGIN_MUTATION } from "@/lib/graphql/queries";
 import { Loader2 } from "lucide-react";
 
 export default function Login() {
   const [, setLocation] = useLocation();
   const { setAuth } = useAuth();
-  const { apiMode } = useApiMode();
+  const { apiMode, isRealApi } = useApiMode();
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
+
+  const [loginMutation, { loading }] = useMutation(LOGIN_MUTATION, {
+    onCompleted: (data) => {
+      setAuth(data.login.user, data.login.token);
+      toast({
+        title: "Welcome back!",
+        description: `Logged in successfully as ${data.login.user.displayName}`,
+      });
+      setLocation("/chat");
+    },
+    onError: (error) => {
+      toast({
+        title: "Login failed",
+        description: error.message || "Please check your credentials",
+        variant: "destructive",
+      });
+    },
+  });
 
   const {
     register,
@@ -33,37 +53,21 @@ export default function Login() {
   });
 
   const onSubmit = async (data: LoginCredentials) => {
-    setIsLoading(true);
-    try {
-      const response = await fetch(`/api/auth/login?mode=${apiMode}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Login failed");
-      }
-
-      const authData = await response.json();
-      setAuth(authData.user, authData.token);
-      
+    if (isRealApi) {
       toast({
-        title: "Welcome back!",
-        description: `Logged in successfully as ${authData.user.displayName}`,
-      });
-
-      setLocation("/chat");
-    } catch (error) {
-      toast({
-        title: "Login failed",
-        description: error instanceof Error ? error.message : "Please check your credentials",
+        title: "Real API not available",
+        description: "Real Bonfire API authentication is not yet implemented. Please use mock mode.",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
+      return;
     }
+
+    await loginMutation({
+      variables: {
+        username: data.username,
+        password: data.password,
+      },
+    });
   };
 
   return (
@@ -101,7 +105,7 @@ export default function Login() {
                   data-testid="input-username"
                   placeholder="Enter your username"
                   {...register("username")}
-                  disabled={isLoading}
+                  disabled={loading}
                 />
                 {errors.username && (
                   <p className="text-xs text-destructive" data-testid="error-username">
@@ -118,7 +122,7 @@ export default function Login() {
                   type="password"
                   placeholder="Enter your password"
                   {...register("password")}
-                  disabled={isLoading}
+                  disabled={loading}
                 />
                 {errors.password && (
                   <p className="text-xs text-destructive" data-testid="error-password">
@@ -131,9 +135,9 @@ export default function Login() {
                 data-testid="button-login"
                 type="submit"
                 className="w-full"
-                disabled={isLoading}
+                disabled={loading}
               >
-                {isLoading ? (
+                {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Signing in...
@@ -158,7 +162,7 @@ export default function Login() {
           <code className="font-mono bg-muted px-2 py-1 rounded">
             {apiMode === "real"
               ? "https://discussions.sciety.org/api/graphql"
-              : "/api/graphql/mock"}
+              : "/api/graphql"}
           </code>
         </div>
       </div>

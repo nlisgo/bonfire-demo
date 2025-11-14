@@ -1,24 +1,22 @@
-import { useAuth } from "@/lib/auth-context";
+import * as ApolloClientReact from "@apollo/client/react/index.js";
+const { useQuery } = ApolloClientReact;
+import { User } from "@shared/schema";
 import { useApiMode } from "@/lib/api-mode-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Mail, User as UserIcon, AtSign, Calendar, ExternalLink } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Mail, User as UserIcon, AtSign, Calendar, ExternalLink, AlertCircle } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { GET_ME } from "@/lib/graphql/queries";
 
 export default function Profile() {
-  const { user } = useAuth();
   const { apiMode, isMockApi } = useApiMode();
+  const { data, loading, error, refetch } = useQuery<{ me: User }>(GET_ME);
 
-  if (!user) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <p className="text-muted-foreground">No user data available</p>
-      </div>
-    );
-  }
+  const user = data?.me;
 
   const getInitials = (name: string) => {
     return name
@@ -34,6 +32,55 @@ export default function Profile() {
     const dateObj = typeof date === "string" ? new Date(date) : date;
     return formatDistanceToNow(dateObj, { addSuffix: true });
   };
+
+  if (loading) {
+    return (
+      <div className="h-full overflow-auto">
+        <div className="p-6 max-w-4xl mx-auto space-y-6">
+          <div>
+            <Skeleton className="h-8 w-32 mb-2" />
+            <Skeleton className="h-4 w-64" />
+          </div>
+          <Card>
+            <CardHeader>
+              <div className="flex gap-4">
+                <Skeleton className="h-20 w-20 rounded-full" />
+                <div className="space-y-2">
+                  <Skeleton className="h-8 w-48" />
+                  <Skeleton className="h-4 w-32" />
+                </div>
+              </div>
+            </CardHeader>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-full p-6">
+        <Card className="p-8 max-w-md text-center">
+          <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">Failed to load profile</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            {error.message || "Please try again later"}
+          </p>
+          <Button onClick={() => refetch()}>
+            Retry
+          </Button>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <p className="text-muted-foreground">No user data available</p>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full overflow-auto">
@@ -148,7 +195,7 @@ export default function Profile() {
               <p className="text-sm font-medium mb-2">GraphQL Endpoint</p>
               <code className="text-xs font-mono bg-muted px-2 py-1 rounded block break-all">
                 {isMockApi
-                  ? `${window.location.origin}/api/graphql/mock`
+                  ? `${window.location.origin}/api/graphql`
                   : "https://discussions.sciety.org/api/graphql"}
               </code>
             </div>

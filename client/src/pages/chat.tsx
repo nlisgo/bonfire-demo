@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { ConversationWithMessages, MessageWithSender } from "@shared/schema";
+import * as ApolloClientReact from "@apollo/client/react/index.js";
+const { useQuery, useMutation } = ApolloClientReact;
+import { ConversationWithMessages } from "@shared/schema";
 import { useAuth } from "@/lib/auth-context";
-import { useApiMode } from "@/lib/api-mode-context";
 import { ConversationListItem } from "@/components/conversation-list-item";
 import { MessageBubble } from "@/components/message-bubble";
 import { MessageInput } from "@/components/message-input";
@@ -11,50 +11,45 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { MessageSquare, AlertCircle } from "lucide-react";
-import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { GET_CONVERSATIONS, SEND_MESSAGE_MUTATION } from "@/lib/graphql/queries";
 
 export default function Chat() {
-  const { user, token } = useAuth();
-  const { apiMode } = useApiMode();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const {
-    data: conversations,
-    isLoading: conversationsLoading,
+    data,
+    loading: conversationsLoading,
     error: conversationsError,
-  } = useQuery<ConversationWithMessages[]>({
-    queryKey: ["/api/conversations", apiMode],
-    enabled: !!token,
-  });
+    refetch,
+  } = useQuery<{ conversations: ConversationWithMessages[] }>(GET_CONVERSATIONS);
 
-  const selectedConversation = conversations?.find((c) => c.id === selectedConversationId);
-
-  const sendMessageMutation = useMutation({
-    mutationFn: async (data: { conversationId: string; content: string }) => {
-      return apiRequest("POST", `/api/conversations/${data.conversationId}/messages?mode=${apiMode}`, {
-        content: data.content,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+  const [sendMessage, { loading: sendingMessage }] = useMutation(SEND_MESSAGE_MUTATION, {
+    onCompleted: () => {
+      refetch();
     },
     onError: (error) => {
       toast({
         title: "Failed to send message",
-        description: error instanceof Error ? error.message : "Please try again",
+        description: error.message || "Please try again",
         variant: "destructive",
       });
     },
   });
 
+  const conversations = data?.conversations || [];
+  const selectedConversation = conversations.find((c) => c.id === selectedConversationId);
+
   const handleSendMessage = (content: string) => {
     if (selectedConversationId) {
-      sendMessageMutation.mutate({
-        conversationId: selectedConversationId,
-        content,
+      sendMessage({
+        variables: {
+          conversationId: selectedConversationId,
+          content,
+        },
       });
     }
   };
@@ -112,9 +107,9 @@ export default function Chat() {
           <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
           <h3 className="text-lg font-semibold mb-2">Failed to load conversations</h3>
           <p className="text-sm text-muted-foreground mb-4">
-            {conversationsError instanceof Error ? conversationsError.message : "Please try again later"}
+            {conversationsError.message || "Please try again later"}
           </p>
-          <Button onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/conversations"] })}>
+          <Button onClick={() => refetch()}>
             Retry
           </Button>
         </Card>
@@ -201,7 +196,7 @@ export default function Chat() {
 
             <MessageInput
               onSend={handleSendMessage}
-              disabled={sendMessageMutation.isPending}
+              disabled={sendingMessage}
             />
           </>
         ) : (

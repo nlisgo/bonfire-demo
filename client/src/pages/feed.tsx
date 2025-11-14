@@ -1,29 +1,25 @@
-import { useQuery } from "@tanstack/react-query";
+import * as ApolloClientReact from "@apollo/client/react/index.js";
+const { useQuery } = ApolloClientReact;
 import { ActivityWithSubject } from "@shared/schema";
-import { useAuth } from "@/lib/auth-context";
-import { useApiMode } from "@/lib/api-mode-context";
 import { ActivityItem } from "@/components/activity-item";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Activity, AlertCircle } from "lucide-react";
-import { queryClient } from "@/lib/queryClient";
+import { GET_ACTIVITIES } from "@/lib/graphql/queries";
 
 export default function Feed() {
-  const { token } = useAuth();
-  const { apiMode } = useApiMode();
-
   const {
-    data: activities,
-    isLoading,
+    data,
+    loading,
     error,
-  } = useQuery<ActivityWithSubject[]>({
-    queryKey: ["/api/activities", apiMode],
-    enabled: !!token,
-  });
+    refetch,
+  } = useQuery<{ activities: ActivityWithSubject[] }>(GET_ACTIVITIES);
 
-  if (isLoading) {
+  const activities = data?.activities || [];
+
+  if (loading) {
     return (
       <div className="h-full overflow-hidden">
         <div className="p-6 border-b">
@@ -54,9 +50,9 @@ export default function Feed() {
           <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
           <h3 className="text-lg font-semibold mb-2">Failed to load activity feed</h3>
           <p className="text-sm text-muted-foreground mb-4">
-            {error instanceof Error ? error.message : "Please try again later"}
+            {error.message || "Please try again later"}
           </p>
-          <Button onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/activities"] })}>
+          <Button onClick={() => refetch()}>
             Retry
           </Button>
         </Card>
